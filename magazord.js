@@ -1,143 +1,98 @@
-import axios from "axios";
+import { processarCarrinho, healthCheck } from './src/routes/carrinho.route.js';
+import { processarTodosCarrinhos, processarWebhookMagazord } from './src/routes/auto-scan.route.js';
 
-// =============================
-// CONFIGURAÇÃO MAGAZORD
-// =============================
-const BASE_URL = "https://danajalecos.painel.magazord.com.br/api/v2/site";
-const USER = "MZDKe610ed8d77404c8ebe37b79a35b579a5e4e85682c15d6bd89f30d5852757";
-const PASS = "o#W51myRIS@j";
+/**
+ * Handler principal do Vercel
+ * Roteamento simples baseado no path e método
+ */
+export default async function handler(req, res) {
+  const { method, url } = req;
+  const path = url?.split('?')[0] || '/';
 
-const auth = {
-  auth: {
-    username: USER,
-    password: PASS
+  // Configurar CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Responder OPTIONS para CORS preflight
+  if (method === 'OPTIONS') {
+    return res.status(200).end();
   }
-};
 
-// =============================
-// CONFIG GHL
-// =============================
-const GHL_WEBHOOK =
-  "https://services.leadconnectorhq.com/hooks/scD4yzuj3zsDsqfrgvtZ/webhook-trigger/b6fd6bb0-15ef-4af5-af2b-3122b92376b6";
-
-// =============================
-// CONSULTA CARRINHOS
-// =============================
-async function getCarrinhos() {
-  const res = await axios.get(`${BASE_URL}/carrinho`, {
-    ...auth,
-    params: {
-      limit: 50,
-      page: 1,
-      order: "id",
-      orderDirection: "desc",
-      status: "1,2,3"
-    }
-  });
-  return res.data?.data?.items || [];
-}
-
-// =============================
-// CONSULTA PEDIDOS
-// =============================
-async function getPedidos() {
-  const res = await axios.get(`${BASE_URL}/pedido`, {
-    ...auth,
-    params: {
-      limit: 50,
-      page: 1,
-      orderDirection: "desc"
-    }
-  });
-  return res.data?.data?.items || [];
-}
-
-// =============================
-// CONSULTA PEDIDO PELO CÓDIGO
-// =============================
-async function getPedidoCodigo(codigo) {
   try {
-    const res = await axios.get(`${BASE_URL}/pedido/${codigo}`, {
-      ...auth,
-      params: { listaContatos: 1 }
-    });
-    return res.data?.data || null;
-  } catch {
-    return null;
-  }
-}
+    // Rotas
+    if (path === '/' || path === '/health') {
+      return await healthCheck(req, res);
+    }
 
-// =============================
-// CONSULTA PESSOA
-// =============================
-async function getPessoa(id) {
-  try {
-    const res = await axios.get(`${BASE_URL}/pessoa/${id}`, auth);
-    return res.data || null;
-  } catch {
-    return null;
-  }
-}
+    // ROTA PRINCIPAL: Scan automático de TODOS os carrinhos
+    if (path === '/auto-scan' || path === '/scan') {
+      return await processarTodosCarrinhos(req, res);
+    }
 
-// =============================
-// MONTA JSON FINAL
-// =============================
-async function montarEstrutura() {
-  const carrinhos = await getCarrinhos();
-  const pedidos = await getPedidos();
-  const final = [];
+    // ROTA: Webhook da Magazord (processamento individual em tempo real)
+    if (path === '/webhook-magazord' || path === '/webhook') {
+      return await processarWebhookMagazord(req, res);
+    }
 
-  for (const ped of pedidos) {
-    const pedidoCompleto = await getPedidoCodigo(ped.codigo);
-    const pessoa = await getPessoa(ped.pessoaId);
+    // ROTA LEGADA: Processar carrinho individual manualmente
+    if (path === '/processar' || path === '/processar-carrinho') {
+      if (method !== 'POST' && method !== 'GET') {
+        return res.status(405).json({ 
+          error: true, 
+          message: 'Método não permitido. Use POST ou GET.' 
+        });
+      }
+      return await processarCarrinho(req, res);
+    }
 
-    final.push({
-      pedidoId: ped.id,
-      codigo: ped.codigo,
-      valorTotal: ped.valorTotal,
-      status: ped.pedidoSituacaoDescricao,
-      data: ped.dataHora,
-      carrinhosRelacionados: carrinhos.filter(
-        c => c.pedido?.codigo === ped.codigo
-      ),
-
-      itens: pedidoCompleto?.arrayPedidoRastreio?.[0]?.pedidoItem || [],
-
-      cliente: {
-        nome: pessoa?.nome || "",
-        email: pessoa?.email || "",
-        telefones: pessoa?.pessoaContato?.map(t => t.contato) || []
+    // Rota não encontrada
+    return res.status(404).json({
+      error: true,
+      message: 'Rota não encontrada',
+      rotas_disponiveis: [
+        { 
+          path: '/', 
+          method: 'GET', 
+          descricao: 'Health check' 
+        },
+        { 
+          path: '/auto-scan', 
+          method: 'GET/POST', 
+          descricao: '🤖 SCAN AUTOMÁTICO - Busca e processa TODOS os carrinhos (status 2 e 3)',
+          observacao: 'Evita duplicados automaticamente. Use esta rota no Vercel Cron!'
+        },
+        { 
+          path: '/webhook-magazord', 
+          method: 'POST', 
+          descricao: '📨 WEBHOOK - Recebe notificação da Magazord e processa carrinho individual',
+          parametros: {
+            carrinho_id: 'ID do carrinho (obrigatório)'
+          },
+          observacao: 'Configure esta URL no painel do Magazord para processamento em tempo real'
+        },
+        { 
+          path: '/processar', 
+          method: 'POST/GET', 
+          descricao: 'Processa carrinho individual manualmente',
+          parametros: {
+            carrinho_id: 'ID do carrinho (obrigatório)',
+            ghl_webhook_url: 'URL do webhook do GHL (opcional - usa padrão se omitido)'
+          }
+        }
+      ],
+      modo_recomendado: {
+        automatico: 'Configure Vercel Cron para chamar /auto-scan a cada 5-15 minutos',
+        webhook: 'Configure Magazord para enviar notificações para /webhook-magazord'
       }
     });
-  }
 
-  return final;
-}
-
-// =============================
-// ENVIA PARA O GHL
-// =============================
-async function enviarParaGHL(payload) {
-  await axios.post(GHL_WEBHOOK, payload);
-}
-
-// =============================
-// HANDLER SERVERLESS (VERCEL)
-// =============================
-export default async function handler(req, res) {
-  try {
-    const dados = await montarEstrutura();
-    await enviarParaGHL({ pedidos: dados });
-
-    res.status(200).json({
-      status: "ok",
-      enviado_para_GHL: true,
-      total_registros: dados.length
-    });
-  } catch (err) {
-    res.status(500).json({
+  } catch (error) {
+    console.error('Erro no handler:', error);
+    return res.status(500).json({
       error: true,
-      mensagem: err?.response?.data || err.toString()
+      message: 'Erro interno do servidor',
+      details: error.message
     });
   }
 }

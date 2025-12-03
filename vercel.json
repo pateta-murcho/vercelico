@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "/magazord.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/auto-scan",
+      "schedule": "*/15 * * * *"
+    }
   ]
 }
