@@ -64,16 +64,6 @@ export async function processarTodosCarrinhos(req, res) {
       const carrinhoId = carrinho.id;
       
       try {
-        // Verificar se já foi processado
-        if (ControleProcessamento.jaFoiProcessado(carrinhoId)) {
-          console.log(`⏭️  Carrinho ${carrinhoId} - JÁ PROCESSADO (ignorando)`);
-          resultados.ignorados.push({
-            carrinho_id: carrinhoId,
-            motivo: 'já_processado'
-          });
-          continue;
-        }
-
         console.log(`🔄 Processando carrinho ${carrinhoId}...`);
 
         // Coletar dados completos
@@ -84,9 +74,6 @@ export async function processarTodosCarrinhos(req, res) {
 
         // Enviar para GHL
         await ghlService.enviarDados(dadosTransformados);
-
-        // Marcar como processado
-        ControleProcessamento.marcarComoProcessado(carrinhoId);
 
         console.log(`✅ Carrinho ${carrinhoId} - SUCESSO`);
         console.log('');
@@ -181,18 +168,6 @@ export async function processarWebhookMagazord(req, res) {
 
     console.log(`🎯 Processando carrinho ${carrinhoId} via webhook...`);
 
-    // Verificar se já foi processado
-    if (ControleProcessamento.jaFoiProcessado(carrinhoId)) {
-      console.log(`⏭️  Carrinho ${carrinhoId} já foi processado (ignorando duplicata)`);
-      return res.status(200).json({
-        success: true,
-        message: 'Carrinho já foi processado anteriormente',
-        carrinho_id: carrinhoId,
-        ignorado: true,
-        timestamp: new Date().toISOString()
-      });
-    }
-
     // Inicializar serviços
     const magazordService = new MagazordService();
     const transformerService = new TransformerService();
@@ -209,9 +184,6 @@ export async function processarWebhookMagazord(req, res) {
     // Enviar para GHL
     console.log('🚀 Enviando para GHL...');
     await ghlService.enviarDados(dadosTransformados);
-
-    // Marcar como processado
-    ControleProcessamento.marcarComoProcessado(carrinhoId);
 
     console.log(`✅ Carrinho ${carrinhoId} processado com sucesso via webhook`);
     console.log('');

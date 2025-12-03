@@ -27,6 +27,7 @@ export class TransformerService {
         nome: pessoa.nome || '',
         email: pessoa.email || '',
         telefone: telefone
+        // ENDEREÇO REMOVIDO - sempre vazio no Magazord
       },
 
       pedido: {
