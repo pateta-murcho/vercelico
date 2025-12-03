@@ -4,6 +4,7 @@ import { processarTodosCarrinhos, processarWebhookMagazord } from './src/routes/
 /**
  * Handler principal do Vercel
  * Roteamento simples baseado no path e método
+ * Última atualização: 2025-12-03 19:47
  */
 export default async function handler(req, res) {
   const { method, url } = req;
