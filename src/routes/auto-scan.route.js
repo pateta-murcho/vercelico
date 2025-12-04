@@ -86,13 +86,25 @@ export async function processarTodosCarrinhos(req, res) {
         });
 
       } catch (error) {
-        console.error(`❌ Carrinho ${carrinhoId} - ERRO: ${error.message}`);
-        console.log('');
-        
-        resultados.erros.push({
-          carrinho_id: carrinhoId,
-          erro: error.message
-        });
+        // Se o erro for por falta de email/telefone, apenas ignora (não é erro crítico)
+        if (error.message.includes('não possui email nem telefone')) {
+          console.log(`⏭️  Carrinho ${carrinhoId} - IGNORADO: ${error.message}`);
+          console.log('');
+          
+          resultados.ignorados.push({
+            carrinho_id: carrinhoId,
+            motivo: 'sem_email_telefone'
+          });
+        } else {
+          // Outros erros são registrados como falha
+          console.error(`❌ Carrinho ${carrinhoId} - ERRO: ${error.message}`);
+          console.log('');
+          
+          resultados.erros.push({
+            carrinho_id: carrinhoId,
+            erro: error.message
+          });
+        }
       }
     }
 

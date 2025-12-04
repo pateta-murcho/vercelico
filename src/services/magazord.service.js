@@ -196,6 +196,14 @@ export class MagazordService {
         throw new Error(`Pessoa ${pessoaId} não encontrada`);
       }
 
+      // 4. VALIDAÇÃO OBRIGATÓRIA: Verificar se tem email OU telefone
+      const email = pessoa.email || '';
+      const telefone = this.extrairTelefone(pessoa);
+      
+      if (!email && !telefone) {
+        throw new Error(`Carrinho ${carrinhoId} - Pessoa ${pessoaId} não possui email nem telefone (obrigatório para GHL)`);
+      }
+
       console.log(`✅ Dados coletados com sucesso para carrinho ${carrinhoId}`);
 
       return {
@@ -207,5 +215,25 @@ export class MagazordService {
       console.error(`❌ Erro na coleta de dados completos:`, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Extrai o telefone principal da pessoa
+   */
+  extrairTelefone(pessoa) {
+    const contatos = pessoa.pessoaContato || [];
+    
+    // Priorizar celular
+    const celular = contatos.find(c => c.tipoContato === 'celular' || c.tipoContato === 'telefone');
+    if (celular && celular.contato) {
+      return celular.contato;
+    }
+
+    // Se não houver, pegar o primeiro contato que não esteja vazio
+    if (contatos.length > 0 && contatos[0].contato) {
+      return contatos[0].contato;
+    }
+
+    return '';
   }
 }
