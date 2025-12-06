@@ -1,5 +1,6 @@
 import { processarCarrinho, healthCheck } from './src/routes/carrinho.route.js';
 import { processarTodosCarrinhos, processarWebhookMagazord } from './src/routes/auto-scan.route.js';
+import { webhookStatusPedido, scanPedidosRecentes } from './src/routes/pedido.route.js';
 
 /**
  * Handler principal do Vercel
@@ -34,6 +35,16 @@ export default async function handler(req, res) {
     // ROTA: Webhook da Magazord (processamento individual em tempo real)
     if (path === '/webhook-magazord' || path === '/webhook') {
       return await processarWebhookMagazord(req, res);
+    }
+
+    // ROTA: Webhook para mudanças de status de pedidos
+    if (path === '/webhook-status' || path === '/webhook-pedido') {
+      return await webhookStatusPedido(req, res);
+    }
+
+    // ROTA: Scan manual de pedidos recentes (últimos 7 dias)
+    if (path === '/scan-pedidos' || path === '/pedidos') {
+      return await scanPedidosRecentes(req, res);
     }
 
     // ROTA LEGADA: Processar carrinho individual manualmente
@@ -71,6 +82,31 @@ export default async function handler(req, res) {
             carrinho_id: 'ID do carrinho (obrigatório)'
           },
           observacao: 'Configure esta URL no painel do Magazord para processamento em tempo real'
+        },
+        {
+          path: '/webhook-status',
+          method: 'POST',
+          descricao: '📦 WEBHOOK STATUS - Recebe mudanças de status de pedidos do Magazord',
+          parametros: {
+            pedido_codigo: 'Código do pedido (obrigatório)',
+            situacao: 'Código da situação (opcional)'
+          },
+          observacao: 'Processa status desde Aguardando Pagamento até envio (NÃO processa já Entregues)',
+          situacoes: {
+            1: 'Aguardando Pagamento',
+            3: 'Pago',
+            4: 'Aprovado',
+            8: 'Entregue (não processado)'
+          }
+        },
+        {
+          path: '/scan-pedidos',
+          method: 'GET/POST',
+          descricao: '🔍 SCAN PEDIDOS - Busca pedidos recentes (últimos 7 dias)',
+          parametros: {
+            dias: 'Número de dias para buscar (padrão: 7)'
+          },
+          observacao: 'Busca apenas pedidos Aguardando, Pagos e Aprovados (não busca já Entregues)'
         },
         { 
           path: '/processar', 
