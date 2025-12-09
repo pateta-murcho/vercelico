@@ -79,6 +79,55 @@ export class MagazordService {
   }
 
   /**
+   * Busca carrinhos por status específico
+   * @param {number} status - 1=Aberto, 2=Abandonado, 3=Comprado
+   * @param {number} horasAtras - Horas para buscar (máx 24h para evitar timeout)
+   */
+  async listarCarrinhosPorStatus(status, horasAtras = 6) {
+    try {
+      console.log(`Buscando carrinhos com status ${status} das últimas ${horasAtras} horas...`);
+      
+      const dataFim = new Date();
+      const dataInicio = new Date();
+      dataInicio.setHours(dataInicio.getHours() - horasAtras);
+
+      const formatarData = (data) => {
+        const dia = String(data.getDate()).padStart(2, '0');
+        const mes = String(data.getMonth() + 1).padStart(2, '0');
+        const ano = data.getFullYear();
+        const hora = String(data.getHours()).padStart(2, '0');
+        const min = String(data.getMinutes()).padStart(2, '0');
+        const seg = String(data.getSeconds()).padStart(2, '0');
+        return `${dia}/${mes}/${ano} ${hora}:${min}:${seg}`;
+      };
+
+      const response = await axios.get(`${this.baseUrl}/carrinho`, {
+        params: {
+          limit: 100,
+          page: 1,
+          orderDirection: 'desc',
+          status: status,
+          dataAtualizacaoInicio: formatarData(dataInicio),
+          dataAtualizacaoFim: formatarData(dataFim)
+        },
+        auth: this.auth
+      });
+
+      const carrinhos = response.data?.data?.items || [];
+      console.log(`✅ Encontrados ${carrinhos.length} carrinhos com status ${status}`);
+      
+      return carrinhos;
+    } catch (error) {
+      console.error(`❌ Erro ao listar carrinhos com status ${status}:`, error.message);
+      if (error.response) {
+        console.error('Status:', error.response.status);
+        console.error('Resposta:', JSON.stringify(error.response.data, null, 2));
+      }
+      throw new Error(`Erro ao listar carrinhos: ${error.message}`);
+    }
+  }
+
+  /**
    * Busca lista de carrinhos com status 2 ou 3 (convertidos)
    * LIMITAÇÃO DA API: Máximo 30 dias por requisição!
    * Para períodos maiores, faz múltiplas requisições

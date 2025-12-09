@@ -28,8 +28,10 @@ export class PedidoTransformerService {
       pedido_codigo: pedido.codigo || '',
       
       status: {
-        codigo: pedido.pedidoSituacaoId || 0,
+        codigo: pedido.pedidoSituacao || pedido.pedidoSituacaoId || 0,
         descricao: pedido.pedidoSituacaoDescricao || '',
+        descricao_simples: this.getDescricaoSimples(pedido.pedidoSituacao || pedido.pedidoSituacaoId),
+        explicacao: this.getExplicacaoStatus(pedido.pedidoSituacao || pedido.pedidoSituacaoId),
         data_atualizacao: pedido.dataAtualizacao || pedido.dataHora || ''
       },
 
@@ -67,24 +69,45 @@ export class PedidoTransformerService {
     if (!rastreamento) {
       return {
         status: 'sem_rastreamento',
-        mensagem: 'Pedido ainda não foi enviado'
+        mensagem: 'Pedido ainda não foi enviado',
+        
+        // Flags de disponibilidade
+        tem_codigo_rastreio: false,
+        tem_link_rastreio: false,
+        tem_transportadora: false,
+        tem_previsao_entrega: false,
+        
+        // Endereço sempre disponível
+        endereco_entrega: this.extrairEnderecoEntregaDoPedido(pedido)
       };
     }
 
     // Extrair dados de rastreamento
     const rastreioInfo = rastreamento.arrayPedidoRastreio?.[0] || {};
     
+    const codigoRastreio = rastreioInfo.codigoRastreamento || '';
+    const linkRastreio = rastreioInfo.linkRastreamento || '';
+    const transportadora = rastreioInfo.transportadoraNome || '';
+    const previsaoEntrega = rastreioInfo.previsaoEntrega || '';
+    
     return {
       status: 'rastreavel',
-      codigo_rastreio: rastreioInfo.codigoRastreamento || '',
-      transportadora: rastreioInfo.transportadoraNome || '',
-      link_rastreio: rastreioInfo.linkRastreamento || '',
       
-      previsao_entrega: rastreioInfo.previsaoEntrega || '',
+      // Dados de rastreamento
+      codigo_rastreio: codigoRastreio,
+      transportadora: transportadora,
+      link_rastreio: linkRastreio,
+      previsao_entrega: previsaoEntrega,
       data_postagem: rastreioInfo.dataPostagem || '',
       
+      // Flags de disponibilidade (para facilitar no GHL)
+      tem_codigo_rastreio: !!codigoRastreio,
+      tem_link_rastreio: !!linkRastreio,
+      tem_transportadora: !!transportadora,
+      tem_previsao_entrega: !!previsaoEntrega,
+      
       // Endereço de entrega
-      endereco_entrega: this.extrairEnderecoEntrega(rastreioInfo),
+      endereco_entrega: this.extrairEnderecoEntrega(rastreioInfo) || this.extrairEnderecoEntregaDoPedido(pedido),
       
       // Histórico de eventos de rastreamento
       eventos: this.extrairEventosRastreamento(rastreioInfo)
@@ -92,7 +115,23 @@ export class PedidoTransformerService {
   }
 
   /**
-   * Extrai endereço de entrega
+   * Extrai endereço de entrega diretamente do pedido (sempre disponível)
+   */
+  extrairEnderecoEntregaDoPedido(pedido) {
+    return {
+      destinatario: pedido.nomeDestinatario || '',
+      logradouro: pedido.logradouro || '',
+      numero: pedido.numero || '',
+      complemento: pedido.complemento || '',
+      bairro: pedido.bairro || '',
+      cidade: pedido.cidadeNome || '',
+      estado: pedido.estadoSigla || '',
+      cep: pedido.cep || ''
+    };
+  }
+
+  /**
+   * Extrai endereço de entrega do rastreio
    */
   extrairEnderecoEntrega(rastreioInfo) {
     const endereco = rastreioInfo.pedidoEndereco;
@@ -182,12 +221,48 @@ export class PedidoTransformerService {
   }
 
   /**
+   * Retorna descrição simplificada do status com explicação
+   */
+  getDescricaoSimples(situacaoCodigo) {
+    const mapa = {
+      0: 'cancelado',
+      1: 'aguardando_pagamento',
+      2: 'pagamento_expirado',
+      3: 'pago',
+      4: 'aprovado',
+      5: 'em_disputa',
+      6: 'devolvido',
+      7: 'cancelado',
+      8: 'entregue'
+    };
+
+    return mapa[situacaoCodigo] || 'desconhecido';
+  }
+
+  /**
+   * Retorna explicação detalhada do status do pedido
+   */
+  getExplicacaoStatus(situacaoCodigo) {
+    const explicacoes = {
+      0: 'Pedido cancelado automaticamente pelo sistema (timeout de pagamento ou estoque indisponível)',
+      1: 'Cliente finalizou o checkout mas ainda não efetuou o pagamento',
+      2: 'Tempo limite para pagamento expirado (PIX/Boleto não pago no prazo)',
+      3: 'Pagamento confirmado pelo gateway',
+      4: 'Pedido aprovado e liberado para separação/envio',
+      7: 'Pedido cancelado manualmente pelo lojista ou cliente'
+    };
+
+    return explicacoes[situacaoCodigo] || null;
+  }
+
+  /**
    * Determina o tipo de evento baseado na situação
    */
   getTipoEvento(situacaoCodigo) {
     const mapa = {
+      0: 'pedido_cancelado',
       1: 'aguardando_pagamento',
-      2: 'em_analise',
+      2: 'pagamento_expirado',
       3: 'pagamento_confirmado',
       4: 'pedido_aprovado',
       5: 'em_disputa',

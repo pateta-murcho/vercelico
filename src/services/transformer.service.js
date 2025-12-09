@@ -21,7 +21,12 @@ export class TransformerService {
     const estruturaFinal = {
       pedido_id: pedido.id || 0,
       carrinho_id: carrinhoId,
-      status_carrinho: carrinho.status || 0,
+      
+      status_carrinho: {
+        codigo: carrinho.status || 0,
+        descricao_simples: this.getDescricaoCarrinho(carrinho.status),
+        explicacao: this.getExplicacaoCarrinho(carrinho.status)
+      },
 
       pessoa: {
         nome: pessoa.nome || '',
@@ -136,5 +141,31 @@ export class TransformerService {
     }
 
     return 'Não informado';
+  }
+
+  /**
+   * Retorna descrição simplificada do status do carrinho
+   */
+  getDescricaoCarrinho(statusCodigo) {
+    const mapa = {
+      1: 'aberto',
+      2: 'abandonado',
+      3: 'pedido_feito'
+    };
+
+    return mapa[statusCodigo] || 'desconhecido';
+  }
+
+  /**
+   * Retorna explicação do status do carrinho
+   */
+  getExplicacaoCarrinho(statusCodigo) {
+    const explicacoes = {
+      1: 'Cliente adicionou produtos ao carrinho mas ainda não foi para o checkout',
+      2: 'Cliente finalizou o checkout mas não completou o pagamento no prazo (carrinho abandonado)',
+      3: 'Cliente completou o checkout e o pedido foi confirmado'
+    };
+
+    return explicacoes[statusCodigo] || null;
   }
 }

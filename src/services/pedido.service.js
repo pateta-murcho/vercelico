@@ -19,7 +19,7 @@ export class PedidoService {
    * Situações disponíveis:
    * 0 = Cancelado
    * 1 = Aguardando Pagamento
-   * 2 = Em análise
+   * 2 = Em análise / Pagamento Expirado
    * 3 = Pago
    * 4 = Aprovado
    * 5 = Em disputa
@@ -27,7 +27,7 @@ export class PedidoService {
    * 7 = Cancelado
    * 8 = Entregue
    */
-  async listarPedidosPorSituacao(situacoes = [1, 3, 4], diasAtras = 7) {
+  async listarPedidosPorSituacao(situacoes = [0, 1, 2, 3, 4], diasAtras = 7) {
     try {
       const dataFim = new Date();
       const dataInicio = new Date();

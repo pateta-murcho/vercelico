@@ -130,10 +130,10 @@ export async function scanPedidosRecentes(req, res) {
 
     // Definir parâmetros da busca
     const diasAtras = parseInt(req.query?.dias) || 7;
-    const situacoes = [1, 3, 4]; // Aguardando, Pago, Aprovado
+    const situacoes = [0, 1, 2, 3, 4]; // Cancelado, Aguardando, Expirado, Pago, Aprovado
 
     console.log(`📊 Buscando pedidos dos últimos ${diasAtras} dias`);
-    console.log(`🎯 Situações: Aguardando Pagamento (1), Pago (3), Aprovado (4)`);
+    console.log(`🎯 Situações: Cancelado (0), Aguardando Pagamento (1), Expirado (2), Pago (3), Aprovado (4)`);
     console.log('');
 
     // 1. Buscar pedidos
