@@ -43,6 +43,7 @@ export class PedidoTransformerService {
         data_pedido: pedido.dataHora || '',
         valor_total: pedido.valorTotal || 0,
         forma_pagamento: this.extrairFormaPagamento(pedido),
+        link_pagamento: pedido.linkPagamento || null,
         itens: itens
       },
 
@@ -157,6 +158,14 @@ export class PedidoTransformerService {
       valor_unitario: item.valorUnitario || 0,
       valor_total: item.valorTotal || 0
     }));
+  }
+
+  /**
+   * Verifica se o pedido tem link de pagamento disponível
+   * Útil para PIX, boletos e outros métodos que geram link
+   */
+  temLinkPagamento(pedido) {
+    return !!pedido.linkPagamento;
   }
 
   /**
