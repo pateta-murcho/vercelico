@@ -1,7 +1,9 @@
 import axios from 'axios';
+import { RetryHelper, DataValidator, Logger } from '../utils/error-handler.js';
 
 /**
  * Serviço para interagir com pedidos e rastreamento do Magazord
+ * Com retry automático e validação de dados
  */
 export class PedidoService {
   constructor() {
@@ -12,6 +14,9 @@ export class PedidoService {
       username: this.username,
       password: this.password
     };
+    
+    // Configurar timeout
+    axios.defaults.timeout = 30000;
   }
 
   /**
@@ -24,10 +29,10 @@ export class PedidoService {
    * 4 = Aprovado
    * 5 = Em disputa
    * 6 = Devolvido
-   * 7 = Cancelado
+   * 7 = Cancelado (manual)
    * 8 = Entregue
    */
-  async listarPedidosPorSituacao(situacoes = [0, 1, 2, 3, 4], diasAtras = 7) {
+  async listarPedidosPorSituacao(situacoes = [0, 1, 2, 3, 4, 7], diasAtras = 7) {
     try {
       const dataFim = new Date();
       const dataInicio = new Date();

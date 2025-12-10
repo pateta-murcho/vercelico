@@ -2,6 +2,7 @@ import { processarCarrinho, healthCheck } from './src/routes/carrinho.route.js';
 import { processarTodosCarrinhos, processarWebhookMagazord } from './src/routes/auto-scan.route.js';
 import { webhookStatusPedido, scanPedidosRecentes } from './src/routes/pedido.route.js';
 import { scanCarrinhosAbandonados } from './src/routes/carrinho-abandonado.route.js';
+import { scanCarrinhosAbertos } from './src/routes/carrinho-aberto.route.js';
 
 /**
  * Handler principal do Vercel
@@ -51,6 +52,11 @@ export default async function handler(req, res) {
     // ROTA: Scan de carrinhos abandonados (status 2)
     if (path === '/scan-carrinhos-abandonados' || path === '/carrinhos-abandonados') {
       return await scanCarrinhosAbandonados(req, res);
+    }
+
+    // ROTA: Scan de carrinhos abertos (status 1)
+    if (path === '/scan-carrinhos-abertos' || path === '/carrinhos-abertos') {
+      return await scanCarrinhosAbertos(req, res);
     }
 
     // ROTA LEGADA: Processar carrinho individual manualmente

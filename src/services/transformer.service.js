@@ -161,8 +161,8 @@ export class TransformerService {
    */
   getExplicacaoCarrinho(statusCodigo) {
     const explicacoes = {
-      1: 'Cliente adicionou produtos ao carrinho mas ainda não foi para o checkout',
-      2: 'Cliente finalizou o checkout mas não completou o pagamento no prazo (carrinho abandonado)',
+      1: 'Cliente adicionou produtos ao carrinho mas ainda não iniciou o checkout',
+      2: 'Cliente iniciou o checkout mas não completou o pagamento no prazo (carrinho abandonado)',
       3: 'Cliente completou o checkout e o pedido foi confirmado'
     };
 

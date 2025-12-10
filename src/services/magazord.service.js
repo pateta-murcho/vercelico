@@ -1,7 +1,9 @@
 ﻿import axios from 'axios';
+import { RetryHelper, DataValidator, Logger } from '../utils/error-handler.js';
 
 /**
  * Serviço para interagir com a API Magazord
+ * Com retry automático e validação de dados
  */
 export class MagazordService {
   constructor() {
@@ -12,6 +14,9 @@ export class MagazordService {
       username: this.username,
       password: this.password
     };
+    
+    // Configurar timeout para axios
+    axios.defaults.timeout = 30000; // 30 segundos
   }
 
   /**
@@ -19,63 +24,123 @@ export class MagazordService {
    * Nota: A API não suporta GET /carrinho/{id}, então buscamos via lista
    */
   async getCarrinho(carrinhoId) {
-    try {
-      // Buscar via listagem com filtro
-      const response = await axios.get(`${this.baseUrl}/carrinho`, {
-        params: {
-          limit: 1,
-          page: 1,
-          id: carrinhoId
-        },
-        auth: this.auth
-      });
+    return RetryHelper.executeWithRetry(async () => {
+      try {
+        Logger.log(`Buscando carrinho ${carrinhoId}...`);
+        
+        // Buscar via listagem com filtro
+        const response = await axios.get(`${this.baseUrl}/carrinho`, {
+          params: {
+            limit: 1,
+            page: 1,
+            id: carrinhoId
+          },
+          auth: this.auth,
+          timeout: 15000
+        });
 
-      const carrinhos = response.data?.data?.items || [];
-      if (carrinhos.length > 0) {
-        return carrinhos[0];
+        const carrinhos = response.data?.data?.items || [];
+        
+        if (carrinhos.length === 0) {
+          Logger.warn(`Carrinho ${carrinhoId} não encontrado`);
+          return null;
+        }
+        
+        const carrinho = carrinhos[0];
+        
+        // Validar dados do carrinho
+        const validation = DataValidator.validateCarrinho(carrinho);
+        if (!validation.valid) {
+          Logger.error(`Carrinho ${carrinhoId} com dados inválidos:`, validation.errors);
+          throw new Error(`Carrinho inválido: ${validation.errors.join(', ')}`);
+        }
+        
+        Logger.success(`Carrinho ${carrinhoId} obtido com sucesso`);
+        return carrinho;
+        
+      } catch (error) {
+        Logger.error(`Erro ao consultar carrinho ${carrinhoId}`, error);
+        throw error;
       }
-      
-      return null;
-    } catch (error) {
-      console.error(`Erro ao consultar carrinho ${carrinhoId}:`, error.message);
-      throw new Error(`Erro ao buscar carrinho ${carrinhoId}: ${error.message}`);
-    }
+    }, { maxRetries: 3, initialDelay: 1000 });
   }
 
   /**
    * Consulta pedido pelo código
    */
   async getPedido(codigoPedido) {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/pedido/${codigoPedido}`,
-        {
-          params: { listaContatos: 1 },
-          auth: this.auth
-        }
-      );
+    return RetryHelper.executeWithRetry(async () => {
+      try {
+        Logger.log(`Buscando pedido ${codigoPedido}...`);
+        
+        const response = await axios.get(
+          `${this.baseUrl}/pedido/${codigoPedido}`,
+          {
+            params: { listaContatos: 1 },
+            auth: this.auth,
+            timeout: 15000
+          }
+        );
 
-      return response.data?.data || null;
-    } catch (error) {
-      console.error(`Erro ao consultar pedido ${codigoPedido}:`, error.message);
-      throw new Error(`Erro ao buscar pedido ${codigoPedido}: ${error.message}`);
-    }
+        const pedido = response.data?.data || null;
+        
+        if (!pedido) {
+          Logger.warn(`Pedido ${codigoPedido} não encontrado`);
+          return null;
+        }
+        
+        // Validar dados do pedido
+        const validation = DataValidator.validatePedido(pedido);
+        if (!validation.valid) {
+          Logger.error(`Pedido ${codigoPedido} com dados inválidos:`, validation.errors);
+          throw new Error(`Pedido inválido: ${validation.errors.join(', ')}`);
+        }
+        
+        Logger.success(`Pedido ${codigoPedido} obtido com sucesso`);
+        return pedido;
+        
+      } catch (error) {
+        Logger.error(`Erro ao consultar pedido ${codigoPedido}`, error);
+        throw error;
+      }
+    }, { maxRetries: 3, initialDelay: 1000 });
   }
 
   /**
    * Consulta pessoa por ID
    */
   async getPessoa(pessoaId) {
-    try {
-      const response = await axios.get(`${this.baseUrl}/pessoa/${pessoaId}`, {
-        auth: this.auth
-      });
+    return RetryHelper.executeWithRetry(async () => {
+      try {
+        Logger.log(`Buscando pessoa ${pessoaId}...`);
+        
+        const response = await axios.get(`${this.baseUrl}/pessoa/${pessoaId}`, {
+          auth: this.auth,
+          timeout: 15000
+        });
 
-      return response.data?.data || null;
-    } catch (error) {
-      console.error(`Erro ao consultar pessoa ${pessoaId}:`, error.message);
-      throw new Error(`Erro ao buscar pessoa ${pessoaId}: ${error.message}`);
-    }
+        const pessoa = response.data?.data || null;
+        
+        if (!pessoa) {
+          Logger.warn(`Pessoa ${pessoaId} não encontrada`);
+          return null;
+        }
+        
+        // Validar dados da pessoa
+        const validation = DataValidator.validatePessoa(pessoa);
+        if (!validation.valid) {
+          Logger.error(`Pessoa ${pessoaId} com dados inválidos:`, validation.errors);
+          throw new Error(`Pessoa inválida: ${validation.errors.join(', ')}`);
+        }
+        
+        Logger.success(`Pessoa ${pessoaId} obtida com sucesso`);
+        return pessoa;
+        
+      } catch (error) {
+        Logger.error(`Erro ao consultar pessoa ${pessoaId}`, error);
+        throw error;
+      }
+    }, { maxRetries: 3, initialDelay: 1000 });
   }
 
   /**

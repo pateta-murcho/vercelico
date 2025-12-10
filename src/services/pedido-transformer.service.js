@@ -248,7 +248,7 @@ export class PedidoTransformerService {
       1: 'Cliente finalizou o checkout mas ainda não efetuou o pagamento',
       2: 'Tempo limite para pagamento expirado (PIX/Boleto não pago no prazo)',
       3: 'Pagamento confirmado pelo gateway',
-      4: 'Pedido aprovado e liberado para separação/envio',
+      4: 'Pedido aprovado e liberado para separação (ainda não foi postado)',
       7: 'Pedido cancelado manualmente pelo lojista ou cliente'
     };
 
