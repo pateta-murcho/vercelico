@@ -177,12 +177,23 @@ export class PedidoService {
         ? { arrayPedidoRastreio: pedido.arrayPedidoRastreio } 
         : null;
 
+      // 5. Buscar dados do carrinho se tiver ID
+      let carrinho = null;
+      if (pedido.carrinhoId) {
+        try {
+          carrinho = await this.getCarrinho(pedido.carrinhoId);
+        } catch (error) {
+          console.log(`⚠️ Não foi possível buscar carrinho ${pedido.carrinhoId}`);
+        }
+      }
+
       console.log(`✅ Dados completos coletados para pedido ${codigoPedido}`);
 
       return {
         pedido,
         pessoa,
-        rastreamento
+        rastreamento,
+        carrinho
       };
     } catch (error) {
       console.error(`❌ Erro ao coletar dados do pedido:`, error.message);
@@ -245,5 +256,22 @@ export class PedidoService {
     };
 
     return mapa[situacaoCodigo] || 'status_atualizado';
+  }
+
+  /**
+   * Consulta carrinho por ID
+   */
+  async getCarrinho(carrinhoId) {
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/carrinho/${carrinhoId}`,
+        { auth: this.auth }
+      );
+
+      return response.data?.data || null;
+    } catch (error) {
+      console.error(`Erro ao consultar carrinho ${carrinhoId}:`, error.message);
+      return null;
+    }
   }
 }

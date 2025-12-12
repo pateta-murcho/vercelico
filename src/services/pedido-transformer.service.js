@@ -35,7 +35,7 @@ export class PedidoTransformerService {
    * Transforma os dados de um pedido para o formato GHL
    */
   transformarPedido(dadosPedido, headers = null) {
-    const { pedido, pessoa, rastreamento } = dadosPedido;
+    const { pedido, pessoa, rastreamento, carrinho } = dadosPedido;
 
     // Extrair telefone principal
     const telefone = this.extrairTelefone(pessoa);
@@ -72,7 +72,20 @@ export class PedidoTransformerService {
         valor_total: this.formatarValor(pedido.valorTotal),
         forma_pagamento: this.extrairFormaPagamento(pedido),
         link_pagamento: pedido.linkPagamento || null,
+        status: pedido.pedidoSituacaoDescricao || '',
+        status_codigo: pedido.pedidoSituacao || pedido.pedidoSituacaoId || 0,
         itens: itens
+      },
+
+      carrinho: {
+        carrinho_id: pedido.carrinhoId || null,
+        status: this.getStatusCarrinho(carrinho),
+        status_codigo: carrinho?.situacao || null,
+        origem: pedido.origem || '',
+        utm_source: pedido.pedidoTrackingSource || '',
+        utm_params: pedido.pedidoTrackingParams || '',
+        ip: pedido.pedidoIp || '',
+        user_agent: pedido.pedidoTrackingUserAgent || ''
       },
 
       // Dados de rastreamento e entrega
@@ -331,5 +344,21 @@ export class PedidoTransformerService {
     };
 
     return mapa[situacaoCodigo] || 'status_atualizado';
+  }
+
+  /**
+   * Retorna descrição do status do carrinho
+   */
+  getStatusCarrinho(carrinho) {
+    if (!carrinho) return 'convertido_em_pedido';
+
+    const mapa = {
+      1: 'aberto',
+      2: 'abandonado',
+      3: 'convertido',
+      4: 'expirado'
+    };
+
+    return mapa[carrinho.situacao] || 'desconhecido';
   }
 }
