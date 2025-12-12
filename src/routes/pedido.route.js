@@ -57,7 +57,7 @@ export async function webhookStatusPedido(req, res) {
 
     // 2. Transformar dados
     console.log('🔄 [2/3] Transformando dados...');
-    const dadosTransformados = transformerService.transformarPedido(dadosPedido);
+    const dadosTransformados = transformerService.transformarPedido(dadosPedido, req.headers);
 
     // Verificar se tem rastreamento
     if (dadosTransformados.entrega.status === 'rastreavel') {

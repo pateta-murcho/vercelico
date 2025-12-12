@@ -83,7 +83,12 @@ export class PedidoService {
     try {
       const response = await axios.get(
         `${this.baseUrl}/pedido/${codigoPedido}`,
-        { auth: this.auth }
+        { 
+          params: {
+            listaItens: 1
+          },
+          auth: this.auth 
+        }
       );
 
       return response.data?.data || null;
@@ -141,7 +146,7 @@ export class PedidoService {
     try {
       console.log(`Coletando dados completos do pedido ${codigoPedido}...`);
 
-      // 1. Buscar pedido
+      // 1. Buscar pedido (já vem com arrayPedidoRastreio)
       const pedido = await this.getPedido(codigoPedido);
       if (!pedido) {
         throw new Error(`Pedido ${codigoPedido} não encontrado`);
@@ -166,8 +171,11 @@ export class PedidoService {
         throw new Error(`Pedido ${codigoPedido} - Pessoa ${pessoaId} não possui email nem telefone (obrigatório para GHL)`);
       }
 
-      // 4. Buscar rastreamento (opcional - pode não existir ainda)
-      const rastreamento = await this.getRastreamento(codigoPedido);
+      // 4. Rastreamento já vem no pedido (arrayPedidoRastreio)
+      // Não precisa buscar separadamente
+      const rastreamento = pedido.arrayPedidoRastreio && pedido.arrayPedidoRastreio.length > 0 
+        ? { arrayPedidoRastreio: pedido.arrayPedidoRastreio } 
+        : null;
 
       console.log(`✅ Dados completos coletados para pedido ${codigoPedido}`);
 

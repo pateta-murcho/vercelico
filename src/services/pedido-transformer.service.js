@@ -6,7 +6,7 @@ export class PedidoTransformerService {
   /**
    * Transforma os dados de um pedido para o formato GHL
    */
-  transformarPedido(dadosPedido) {
+  transformarPedido(dadosPedido, headers = null) {
     const { pedido, pessoa, rastreamento } = dadosPedido;
 
     // Extrair telefone principal
@@ -30,8 +30,6 @@ export class PedidoTransformerService {
       status: {
         codigo: pedido.pedidoSituacao || pedido.pedidoSituacaoId || 0,
         descricao: pedido.pedidoSituacaoDescricao || '',
-        descricao_simples: this.getDescricaoSimples(pedido.pedidoSituacao || pedido.pedidoSituacaoId),
-        explicacao: this.getExplicacaoStatus(pedido.pedidoSituacao || pedido.pedidoSituacaoId),
         data_atualizacao: pedido.dataAtualizacao || pedido.dataHora || ''
       },
 
@@ -59,57 +57,63 @@ export class PedidoTransformerService {
       }
     };
 
+    // Adicionar headers se fornecido
+    if (headers) {
+      estruturaFinal.headers = headers;
+    }
+
     return estruturaFinal;
   }
 
   /**
    * Extrai dados de rastreamento
+   * SEMPRE retorna estrutura completa, mesmo com valores vazios
    */
   extrairRastreamento(rastreamento, pedido) {
+    // Se não vier o rastreamento separado, pegar do pedido
+    if (!rastreamento && pedido.arrayPedidoRastreio && pedido.arrayPedidoRastreio.length > 0) {
+      rastreamento = { arrayPedidoRastreio: pedido.arrayPedidoRastreio };
+    }
+
+    // Estrutura padrão (sempre retorna todos os campos)
+    const estruturaPadrao = {
+      status: 'rastreavel',
+      codigo_rastreio: '',
+      transportadora: '',
+      link_rastreio: '',
+      previsao_entrega: '',
+      data_postagem: '',
+      endereco_entrega: null,
+      eventos: []
+    };
+
     if (!rastreamento) {
-      return {
-        status: 'sem_rastreamento',
-        mensagem: 'Pedido ainda não foi enviado',
-        
-        // Flags de disponibilidade
-        tem_codigo_rastreio: false,
-        tem_link_rastreio: false,
-        tem_transportadora: false,
-        tem_previsao_entrega: false,
-        
-        // Endereço sempre disponível
-        endereco_entrega: this.extrairEnderecoEntregaDoPedido(pedido)
-      };
+      return estruturaPadrao;
     }
 
     // Extrair dados de rastreamento
     const rastreioInfo = rastreamento.arrayPedidoRastreio?.[0] || {};
     
-    const codigoRastreio = rastreioInfo.codigoRastreamento || '';
-    const linkRastreio = rastreioInfo.linkRastreamento || '';
+    const codigoRastreio = rastreioInfo.codigoRastreio || rastreioInfo.codigoRastreamento || '';
+    const linkRastreio = rastreioInfo.link || rastreioInfo.linkRastreamento || '';
     const transportadora = rastreioInfo.transportadoraNome || '';
-    const previsaoEntrega = rastreioInfo.previsaoEntrega || '';
+    const previsaoEntrega = rastreioInfo.dataLimiteEntregaCliente || rastreioInfo.previsaoEntrega || '';
+    const dataPostagem = rastreioInfo.dataPostagem || '';
+    
+    // Extrair endereço (pode ser null se não tiver)
+    let enderecoEntrega = this.extrairEnderecoEntrega(rastreioInfo);
+    if (!enderecoEntrega) {
+      enderecoEntrega = this.extrairEnderecoEntregaDoPedido(pedido);
+    }
     
     return {
       status: 'rastreavel',
-      
-      // Dados de rastreamento
       codigo_rastreio: codigoRastreio,
       transportadora: transportadora,
       link_rastreio: linkRastreio,
       previsao_entrega: previsaoEntrega,
-      data_postagem: rastreioInfo.dataPostagem || '',
-      
-      // Flags de disponibilidade (para facilitar no GHL)
-      tem_codigo_rastreio: !!codigoRastreio,
-      tem_link_rastreio: !!linkRastreio,
-      tem_transportadora: !!transportadora,
-      tem_previsao_entrega: !!previsaoEntrega,
-      
-      // Endereço de entrega
-      endereco_entrega: this.extrairEnderecoEntrega(rastreioInfo) || this.extrairEnderecoEntregaDoPedido(pedido),
-      
-      // Histórico de eventos de rastreamento
+      data_postagem: dataPostagem,
+      endereco_entrega: enderecoEntrega,
       eventos: this.extrairEventosRastreamento(rastreioInfo)
     };
   }
@@ -188,14 +192,21 @@ export class PedidoTransformerService {
    * Extrai os itens do pedido
    */
   extrairItensPedido(pedido) {
-    const itens = pedido.arrayPedidoRastreio?.[0]?.pedidoItem || [];
+    // Tentar pegar direto do pedido
+    let itens = pedido.pedidoItem || [];
+
+    // Se não tiver, pegar do rastreamento
+    if (itens.length === 0 && pedido.arrayPedidoRastreio && pedido.arrayPedidoRastreio.length > 0) {
+      const rastreio = pedido.arrayPedidoRastreio[0];
+      itens = rastreio.pedidoItem || [];
+    }
 
     return itens.map(item => ({
-      produto_id: item.produtoId || 0,
-      descricao: item.produtoNome || '',
+      produto_id: item.produtoDerivacaoId || item.produtoId || 0,
+      descricao: item.descricao || item.produtoNome || '',
       quantidade: item.quantidade || 0,
       valor_unitario: item.valorUnitario || 0,
-      valor_total: item.valorTotal || 0
+      valor_total: item.valorItem || item.valorTotal || 0
     }));
   }
 
@@ -211,6 +222,12 @@ export class PedidoTransformerService {
    * Extrai a forma de pagamento
    */
   extrairFormaPagamento(pedido) {
+    // Tentar pegar do campo direto do pedido
+    if (pedido.formaPagamentoNome) {
+      return pedido.formaPagamentoNome;
+    }
+
+    // Se não, tentar do array de pagamentos
     const pagamentos = pedido.arrayPedidoPagamento || [];
     
     if (pagamentos.length > 0) {
