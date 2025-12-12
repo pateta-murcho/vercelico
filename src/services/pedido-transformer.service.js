@@ -3,6 +3,34 @@
  * Inclui informações de rastreamento e status de entrega
  */
 export class PedidoTransformerService {
+  
+  /**
+   * Determina o tipo de evento baseado nos dados disponíveis
+   */
+  determinarTipoEvento(pedido, rastreamento) {
+    const situacao = pedido.pedidoSituacao || pedido.pedidoSituacaoId;
+    
+    // Se tem rastreamento com código, é evento de entrega
+    if (rastreamento?.arrayPedidoRastreio?.[0]?.codigoRastreio) {
+      return 'entrega_iniciada';
+    }
+    
+    // Mapear situações para eventos específicos
+    const mapeamentoEventos = {
+      0: 'pedido_cancelado',
+      1: 'pedido_criado',           // Aguardando Pagamento
+      2: 'pagamento_expirado',
+      3: 'pagamento_confirmado',     // Pago
+      4: 'pedido_aprovado',          // Aprovado para envio
+      5: 'em_disputa',
+      6: 'pedido_devolvido',
+      7: 'pedido_enviado',           // Em transporte
+      8: 'pedido_entregue'
+    };
+    
+    return mapeamentoEventos[situacao] || 'status_atualizado';
+  }
+
   /**
    * Transforma os dados de um pedido para o formato GHL
    */
@@ -18,8 +46,8 @@ export class PedidoTransformerService {
     // Extrair dados de rastreamento (se existir)
     const dadosRastreamento = this.extrairRastreamento(rastreamento, pedido);
 
-    // Determinar tipo de evento baseado na situação
-    const tipoEvento = this.getTipoEvento(pedido.pedidoSituacaoId);
+    // Determinar tipo de evento baseado nos dados disponíveis
+    const tipoEvento = this.determinarTipoEvento(pedido, rastreamento);
 
     // Montar estrutura final
     const estruturaFinal = {
@@ -41,11 +69,9 @@ export class PedidoTransformerService {
 
       pedido: {
         data_pedido: pedido.dataHora || '',
-        valor_total: pedido.valorTotal || 0,
+        valor_total: this.formatarValor(pedido.valorTotal),
         forma_pagamento: this.extrairFormaPagamento(pedido),
         link_pagamento: pedido.linkPagamento || null,
-        status: pedido.pedidoSituacaoDescricao || '',
-        status_codigo: pedido.pedidoSituacao || pedido.pedidoSituacaoId || 0,
         itens: itens
       },
 
@@ -121,9 +147,23 @@ export class PedidoTransformerService {
   }
 
   /**
+   * Formata valor para string com 2 casas decimais
+   */
+  formatarValor(valor) {
+    if (!valor) return '0.00';
+    const valorNum = typeof valor === 'string' ? parseFloat(valor) : valor;
+    return valorNum.toFixed(2);
+  }
+
+  /**
    * Extrai endereço de entrega diretamente do pedido (sempre disponível)
    */
   extrairEnderecoEntregaDoPedido(pedido) {
+    // Retorna null se não tiver endereço
+    if (!pedido.logradouro && !pedido.cep) {
+      return null;
+    }
+    
     return {
       destinatario: pedido.nomeDestinatario || '',
       logradouro: pedido.logradouro || '',
@@ -207,8 +247,8 @@ export class PedidoTransformerService {
       produto_id: item.produtoDerivacaoId || item.produtoId || 0,
       descricao: item.descricao || item.produtoNome || '',
       quantidade: item.quantidade || 0,
-      valor_unitario: item.valorUnitario || 0,
-      valor_total: item.valorItem || item.valorTotal || 0
+      valor_unitario: this.formatarValor(item.valorUnitario),
+      valor_total: this.formatarValor(item.valorItem || item.valorTotal)
     }));
   }
 
