@@ -44,6 +44,8 @@ export class PedidoTransformerService {
         valor_total: pedido.valorTotal || 0,
         forma_pagamento: this.extrairFormaPagamento(pedido),
         link_pagamento: pedido.linkPagamento || null,
+        status: pedido.pedidoSituacaoDescricao || '',
+        status_codigo: pedido.pedidoSituacao || pedido.pedidoSituacaoId || 0,
         itens: itens
       },
 
